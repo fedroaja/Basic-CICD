@@ -5,8 +5,8 @@ app.get("/", (req, res) => {
   res.json({ message: "Hello from Express CI/CD! Test Deployment" });
 });
 
-app.get("/test-feature", (req, res) => {
-  res.json({ message: "test feature" });
+app.get("/test", (req, res) => {
+  res.json({ message: "Update Deployment" });
 });
 
 const PORT = process.env.PORT || 3000;
