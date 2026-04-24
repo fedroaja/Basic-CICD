@@ -65,16 +65,6 @@ jobs:
           docker compose down --remove-orphans
 
       # -------------------------
-      # DEVELOPMENT
-      # -------------------------
-      - name: Deploy development
-        if: github.ref == 'refs/heads/development'
-        shell: powershell
-        run: |
-          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
-          docker compose up -d --force-recreate
-
-      # -------------------------
       # STAGING
       # -------------------------
       - name: Deploy staging
