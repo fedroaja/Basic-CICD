@@ -10,7 +10,7 @@ app.get("/test", (req, res) => {
 });
 
 app.get("/test1", (req, res) => {
-  res.json({ message: "Update Deployment More" });
+  res.json({ message: "Horay New Update Available" });
 });
 
 const PORT = process.env.PORT || 3000;
