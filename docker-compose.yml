@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   app:
-    image: ghcr.io/fedroaja/Basic-CICD:latest
+    image: ghcr.io/fedroaja/basic-cicd:latest
     container_name: express-app
     ports:
       - "3000:3000"
