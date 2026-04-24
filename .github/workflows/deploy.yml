@@ -35,12 +35,14 @@ jobs:
           docker login ghcr.io -u fedroaja -p "${{ secrets.GHCR_PAT }}"
 
       - name: Build test image
+        shell: powershell
         run: |
-          docker build -t "${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}" .
+          docker build -t "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}" .
 
       - name: Run tests
+        shell: powershell
         run: |
-          docker run --rm "${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}" npm test
+          docker run --rm "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}" npm test
 
   deploy:
     runs-on: self-hosted
@@ -55,40 +57,49 @@ jobs:
           docker logout ghcr.io
           docker login ghcr.io -u fedroaja -p "${{ secrets.GHCR_PAT }}"
 
-      # -------------------------
-      # BUILD & PUSH ONLY ONCE
-      # -------------------------
       - name: Build & Push image
+        shell: powershell
         run: |
-          docker build -t "${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}" .
-          docker tag "${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}" "${REGISTRY}/${IMAGE_NAME}:latest"
+          $tag = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
+          $latest = "$env:REGISTRY/$env:IMAGE_NAME:latest"
 
-          docker push "${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}"
-          docker push "${REGISTRY}/${IMAGE_NAME}:latest"
+          docker build -t $tag .
+          docker tag $tag $latest
+
+          docker push $tag
+          docker push $latest
 
       - name: Stop old containers
-        run: docker compose down --remove-orphans || true
+        shell: powershell
+        run: |
+          docker compose down --remove-orphans
 
       # -------------------------
       # DEVELOPMENT
       # -------------------------
       - name: Deploy development
         if: github.ref == 'refs/heads/development'
+        shell: powershell
         run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}" docker compose up -d --force-recreate
+          $env:IMAGE = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
+          docker compose up -d --force-recreate
 
       # -------------------------
       # STAGING
       # -------------------------
       - name: Deploy staging
         if: github.ref == 'refs/heads/staging'
+        shell: powershell
         run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}" docker compose up -d --force-recreate
+          $env:IMAGE = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
+          docker compose up -d --force-recreate
 
       # -------------------------
       # PRODUCTION
       # -------------------------
       - name: Deploy production
         if: github.ref == 'refs/heads/main'
+        shell: powershell
         run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}:${{ github.sha }}" docker compose up -d --force-recreate
+          $env:IMAGE = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
+          docker compose up -d --force-recreate
