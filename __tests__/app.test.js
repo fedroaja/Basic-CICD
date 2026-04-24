@@ -1,5 +1,5 @@
 const request = require("supertest");
-const app = require("../app");
+const app = require("../index");
 
 describe("Express API", () => {
   it("should return 200 and hello world", async () => {
