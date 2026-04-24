@@ -1,0 +1,53 @@
+stages:
+  - build
+  - test
+  - push
+  - deploy
+
+variables:
+  IMAGE_NAME: registry.gitlab.com/$CI_PROJECT_PATH
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+
+# 1. Build image
+build:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+# 2. Run test
+test:
+  stage: test
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker run $IMAGE_NAME:$IMAGE_TAG npm test
+
+# 3. Push to registry
+push:
+  stage: push
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+  only:
+    - main
+
+# 4. Deploy (simple example)
+deploy:
+  stage: deploy
+  script:
+    - ssh user@your-server "
+        docker login registry.gitlab.com -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD &&
+        docker pull $IMAGE_NAME:$IMAGE_TAG &&
+        docker stop app || true &&
+        docker rm app || true &&
+        docker run -d -p 3000:3000 --name app $IMAGE_NAME:$IMAGE_TAG
+      "
+  only:
+    - main
