@@ -35,9 +35,9 @@ jobs:
           docker run --rm "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}" npm test
 
   deploy:
+    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main'
     runs-on: self-hosted
     needs: test
-
     steps:
       - uses: actions/checkout@v4
 
