@@ -14,24 +14,9 @@ permissions:
 jobs:
   test:
     runs-on: self-hosted
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: fedroaja/basic-cicd
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Debug env
-        shell: powershell
-        run: |
-          Write-Host "REGISTRY = $env:REGISTRY"
-          Write-Host "IMAGE_NAME = $env:IMAGE_NAME"
-
-      - name: Check token length
-        shell: powershell
-        run: |
-          $token = "${{ secrets.GHCR_PAT }}"
-          Write-Host "Token length: $($token.Length)"
 
       - name: Login to GHCR
         shell: powershell
@@ -42,19 +27,16 @@ jobs:
       - name: Build test image
         shell: powershell
         run: |
-          docker build -t "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}" .
+          docker build -t "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}" .
 
       - name: Run tests
         shell: powershell
         run: |
-          docker run --rm "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}" npm test
+          docker run --rm "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}" npm test
 
   deploy:
     runs-on: self-hosted
     needs: test
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: fedroaja/basic-cicd
 
     steps:
       - uses: actions/checkout@v4
@@ -68,8 +50,8 @@ jobs:
       - name: Build & Push image
         shell: powershell
         run: |
-          $tag = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
-          $latest = "$env:REGISTRY/$env:IMAGE_NAME:latest"
+          $tag = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
+          $latest = "ghcr.io/fedroaja/basic-cicd:latest"
 
           docker build -t $tag .
           docker tag $tag $latest
@@ -82,23 +64,32 @@ jobs:
         run: |
           docker compose down --remove-orphans
 
+      # -------------------------
+      # DEVELOPMENT
+      # -------------------------
       - name: Deploy development
         if: github.ref == 'refs/heads/development'
         shell: powershell
         run: |
-          $env:IMAGE = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
           docker compose up -d --force-recreate
 
+      # -------------------------
+      # STAGING
+      # -------------------------
       - name: Deploy staging
         if: github.ref == 'refs/heads/staging'
         shell: powershell
         run: |
-          $env:IMAGE = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
           docker compose up -d --force-recreate
 
+      # -------------------------
+      # PRODUCTION
+      # -------------------------
       - name: Deploy production
         if: github.ref == 'refs/heads/main'
         shell: powershell
         run: |
-          $env:IMAGE = "$env:REGISTRY/$env:IMAGE_NAME:${{ github.sha }}"
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
           docker compose up -d --force-recreate
