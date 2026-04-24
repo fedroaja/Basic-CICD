@@ -1,8 +1,14 @@
-version: '3.8'
+version: "3.8"
 
 services:
   app:
-    image: registry.gitlab.com/<username>/<project>:latest
+    build: .
+    container_name: express-app
     ports:
       - "3000:3000"
-    restart: always
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
