@@ -1,19 +1,95 @@
-name: Deploy to Windows Runner
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - development
+      - staging
+      - main
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  deploy:
+  test:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Stop old container
-        run: docker compose down
+      - name: Login to GHCR
+        shell: powershell
+        run: |
+          docker logout ghcr.io
+          docker login ghcr.io -u fedroaja -p "${{ secrets.GHCR_PAT }}"
 
-      - name: Build & Start container
-        run: docker compose up -d --build
+      - name: Build test image
+        shell: powershell
+        run: |
+          docker build -t "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}" .
+
+      - name: Run tests
+        shell: powershell
+        run: |
+          docker run --rm "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}" npm test
+
+  deploy:
+    runs-on: self-hosted
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        shell: powershell
+        run: |
+          docker logout ghcr.io
+          docker login ghcr.io -u fedroaja -p "${{ secrets.GHCR_PAT }}"
+
+      - name: Build & Push image
+        shell: powershell
+        run: |
+          $tag = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
+          $latest = "ghcr.io/fedroaja/basic-cicd:latest"
+
+          docker build -t $tag .
+          docker tag $tag $latest
+
+          docker push $tag
+          docker push $latest
+
+      - name: Stop old containers
+        shell: powershell
+        run: |
+          docker compose down --remove-orphans
+
+      # -------------------------
+      # DEVELOPMENT
+      # -------------------------
+      - name: Deploy development
+        if: github.ref == 'refs/heads/development'
+        shell: powershell
+        run: |
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
+          docker compose up -d --force-recreate
+
+      # -------------------------
+      # STAGING
+      # -------------------------
+      - name: Deploy staging
+        if: github.ref == 'refs/heads/staging'
+        shell: powershell
+        run: |
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
+          docker compose up -d --force-recreate
+
+      # -------------------------
+      # PRODUCTION
+      # -------------------------
+      - name: Deploy production
+        if: github.ref == 'refs/heads/main'
+        shell: powershell
+        run: |
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
+          docker compose up -d --force-recreate
