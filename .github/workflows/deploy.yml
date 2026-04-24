@@ -22,6 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug token length
+        shell: pwsh
+        run: |
+          echo "Token length: $($env:GHCR_PAT.Length)"
+
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u fedroaja --password-stdin
 
