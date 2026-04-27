@@ -5,28 +5,18 @@ on:
     branches:
       - development
       - staging
-    tags:
-      - "v*.*.*"
+      - main
 
 permissions:
   contents: read
   packages: write
 
-env:
-  IMAGE_NAME: ghcr.io/fedroaja/basic-cicd
-
 jobs:
-  build-test:
+  test:
     runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Debug workspace
-        shell: powershell
-        run: |
-          Write-Host "Workspace: ${{ github.workspace }}"
-          dir ${{ github.workspace }}
 
       - name: Login to GHCR
         shell: powershell
@@ -34,108 +24,62 @@ jobs:
           docker logout ghcr.io
           docker login ghcr.io -u fedroaja -p "${{ secrets.GHCR_PAT }}"
 
-      - name: Build image
+      - name: Build test image
         shell: powershell
         run: |
-          $image = "$env:IMAGE_NAME:temp"
-          $path  = "${{ github.workspace }}"
-
-          docker buildx build --load -t $image $path
+          docker build -t "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}" .
 
       - name: Run tests
         shell: powershell
         run: |
-          $image = "$env:IMAGE_NAME:temp"
-          docker run --rm $image npm test
+          docker run --rm "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}" npm test
 
-  # -------------------------
-  # STAGING DEPLOY
-  # -------------------------
-  deploy-staging:
-    if: github.ref == 'refs/heads/staging'
+  deploy:
+    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main'
     runs-on: self-hosted
-    needs: build-test
-
+    needs: test
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login GHCR
+      - name: Login to GHCR
         shell: powershell
         run: |
+          docker logout ghcr.io
           docker login ghcr.io -u fedroaja -p "${{ secrets.GHCR_PAT }}"
 
-      - name: Build & Push staging image
+      - name: Build & Push image
         shell: powershell
         run: |
-          $tag  = "$env:IMAGE_NAME:staging"
-          $path = "${{ github.workspace }}"
+          $tag = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
+          $latest = "ghcr.io/fedroaja/basic-cicd:latest"
 
-          docker buildx build --load -t $tag $path
+          docker build -t $tag .
+          docker tag $tag $latest
+
           docker push $tag
+          docker push $latest
 
-      - name: Backup current staging
+      - name: Stop old containers
         shell: powershell
         run: |
-          $current = "$env:IMAGE_NAME:staging"
-          $backup  = "$env:IMAGE_NAME:staging-backup"
+          docker compose down --remove-orphans
 
-          docker pull $current
-          docker tag $current $backup
-          docker push $backup
-
+      # -------------------------
+      # STAGING
+      # -------------------------
       - name: Deploy staging
+        if: github.ref == 'refs/heads/staging'
         shell: powershell
         run: |
-          $env:IMAGE = "$env:IMAGE_NAME:staging"
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
           docker compose up -d --force-recreate
 
-  # -------------------------
-  # PRODUCTION DEPLOY
-  # -------------------------
-  deploy-production:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: self-hosted
-    needs: build-test
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Login GHCR
-        shell: powershell
-        run: |
-          docker login ghcr.io -u fedroaja -p "${{ secrets.GHCR_PAT }}"
-
-      - name: Set version
-        shell: powershell
-        run: |
-          $version = "${{ github.ref_name }}"
-          echo "VERSION=$version" >> $env:GITHUB_ENV
-
-      - name: Backup current production
-        shell: powershell
-        run: |
-          $latest   = "$env:IMAGE_NAME:latest"
-          $rollback = "$env:IMAGE_NAME:rollback"
-
-          docker pull $latest
-          docker tag $latest $rollback
-          docker push $rollback
-
-      - name: Build & Push versioned image
-        shell: powershell
-        run: |
-          $versionTag = "$env:IMAGE_NAME:$env:VERSION"
-          $latestTag  = "$env:IMAGE_NAME:latest"
-          $path       = "${{ github.workspace }}"
-
-          docker buildx build --load -t $versionTag $path
-          docker tag $versionTag $latestTag
-
-          docker push $versionTag
-          docker push $latestTag
-
+      # -------------------------
+      # PRODUCTION
+      # -------------------------
       - name: Deploy production
+        if: github.ref == 'refs/heads/main'
         shell: powershell
         run: |
-          $env:IMAGE = "$env:IMAGE_NAME:latest"
+          $env:IMAGE = "ghcr.io/fedroaja/basic-cicd:${{ github.sha }}"
           docker compose up -d --force-recreate
