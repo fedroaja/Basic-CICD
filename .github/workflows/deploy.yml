@@ -22,6 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug workspace
+        shell: powershell
+        run: |
+          Write-Host "Workspace: ${{ github.workspace }}"
+          dir ${{ github.workspace }}
+
       - name: Login to GHCR
         shell: powershell
         run: |
@@ -32,7 +38,9 @@ jobs:
         shell: powershell
         run: |
           $image = "$env:IMAGE_NAME:temp"
-          docker build -t $image .
+          $path  = "${{ github.workspace }}"
+
+          docker buildx build --load -t $image $path
 
       - name: Run tests
         shell: powershell
@@ -59,16 +67,17 @@ jobs:
       - name: Build & Push staging image
         shell: powershell
         run: |
-          $tag = "$env:IMAGE_NAME:staging"
+          $tag  = "$env:IMAGE_NAME:staging"
+          $path = "${{ github.workspace }}"
 
-          docker build -t $tag .
+          docker buildx build --load -t $tag $path
           docker push $tag
 
       - name: Backup current staging
         shell: powershell
         run: |
           $current = "$env:IMAGE_NAME:staging"
-          $backup = "$env:IMAGE_NAME:staging-backup"
+          $backup  = "$env:IMAGE_NAME:staging-backup"
 
           docker pull $current
           docker tag $current $backup
@@ -105,7 +114,7 @@ jobs:
       - name: Backup current production
         shell: powershell
         run: |
-          $latest = "$env:IMAGE_NAME:latest"
+          $latest   = "$env:IMAGE_NAME:latest"
           $rollback = "$env:IMAGE_NAME:rollback"
 
           docker pull $latest
@@ -117,8 +126,9 @@ jobs:
         run: |
           $versionTag = "$env:IMAGE_NAME:$env:VERSION"
           $latestTag  = "$env:IMAGE_NAME:latest"
+          $path       = "${{ github.workspace }}"
 
-          docker build -t $versionTag .
+          docker buildx build --load -t $versionTag $path
           docker tag $versionTag $latestTag
 
           docker push $versionTag
